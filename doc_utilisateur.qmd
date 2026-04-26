@@ -1,0 +1,316 @@
+---
+title: "Analyse SNCF — Guide utilisateur"
+subtitle: "Récupération des billets et analyse des dépenses de déplacement"
+author: "samszon@gmail.com"
+date: today
+lang: fr
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Sommaire"
+    theme: cosmo
+    smooth-scroll: true
+    embed-resources: true
+callout-appearance: simple
+---
+
+## Présentation
+
+Ce projet analyse automatiquement vos confirmations de réservation SNCF Connect pour calculer le **coût réel de chaque déplacement** Lessard-et-le-Chêne ↔ Paris, en additionnant :
+
+- le billet de train SNCF
+- le trajet en voiture jusqu'à la gare de Lisieux
+- les tickets de métro (ligne 13, Saint-Lazare ↔ Saint-Denis Université)
+- le repas du midi
+
+Le résultat est un rapport HTML interactif consultable dans n'importe quel navigateur.
+
+---
+
+## Prérequis
+
+### Logiciels
+
+- **Python 3.9+** — vérifier avec `python3 --version`
+- **Quarto 1.4+** (pour lire ce document) — `quarto --version`
+
+### Fichiers du projet
+
+```
+billets sncf/
+├── sncf_report.py          ← module partagé (coûts + HTML)
+├── fetch_and_report.py     ← récupération Gmail (mode principal)
+├── report_local.py         ← traitement fichiers .eml locaux
+├── credentials.json        ← à créer (voir section Setup Gmail)
+├── token.json              ← créé automatiquement au 1er lancement
+├── email_cache.json        ← créé automatiquement (cache des mails)
+└── billets_sncf_rapport.html  ← rapport généré
+```
+
+---
+
+## Mode 1 — Récupération depuis Gmail (recommandé)
+
+Ce mode télécharge directement les mails depuis votre boîte Gmail, en ne récupérant que les **nouveaux messages** à chaque lancement grâce au cache.
+
+### Étape 1 — Configurer l'API Gmail
+
+```{mermaid}
+sequenceDiagram
+    actor U as Vous
+    participant GC as Google Cloud Console
+    participant FS as Dossier projet
+
+    U->>GC: 1. Créer un projet "billets-sncf"
+    U->>GC: 2. APIs & Services → Bibliothèque\n→ Activer "Gmail API"
+    U->>GC: 3. Identifiants → Créer\n→ ID client OAuth 2.0\n→ Type : Application de bureau
+    GC-->>U: Fichier JSON téléchargé
+    U->>FS: 4. Renommer en "credentials.json"\n   et copier dans le dossier projet
+```
+
+::: {.callout-note}
+Cette configuration n'est nécessaire **qu'une seule fois**. Le fichier `token.json` généré au premier lancement évite de re-autoriser l'application à chaque fois.
+:::
+
+### Étape 2 — Installer les dépendances
+
+```bash
+pip3 install google-auth-oauthlib google-api-python-client
+```
+
+### Étape 3 — Premier lancement
+
+```bash
+cd "/chemin/vers/billets sncf"
+python3 fetch_and_report.py
+```
+
+Un navigateur s'ouvre automatiquement pour vous demander d'autoriser l'accès en lecture à votre Gmail.
+
+```{mermaid}
+sequenceDiagram
+    actor U as Vous
+    participant S as Script Python
+    participant B as Navigateur
+    participant G as Google
+
+    U->>S: python3 fetch_and_report.py
+    S->>B: Ouvrir page d'autorisation Google
+    B->>G: Connexion avec samszon@gmail.com
+    G-->>B: "Autoriser l'accès en lecture ?"
+    U->>B: Cliquer "Autoriser"
+    G-->>S: Token d'accès
+    S->>S: Sauvegarder token.json
+    S->>G: Rechercher mails SNCF
+    G-->>S: 216 messages trouvés
+    S->>S: Télécharger + mettre en cache
+    S->>S: Générer rapport HTML
+    S->>B: Ouvrir billets_sncf_rapport.html
+```
+
+### Lancements suivants
+
+À chaque nouveau lancement, seuls les mails reçus **depuis le dernier cache** sont téléchargés :
+
+```
+============================================================
+  Billets SNCF — Récupération via Gmail API (OAuth2)
+============================================================
+Recherche : from:noreply@connect.sncf subject:"Votre voyage"
+216 message(s) trouvé(s) sur Gmail.
+  216 en cache  ·  0 à télécharger
+Cache à jour, aucun nouveau mail.
+```
+
+Si de nouveaux billets ont été reçus :
+
+```
+217 message(s) trouvé(s) sur Gmail.
+  216 en cache  ·  1 à télécharger
+  téléchargé 1/1…
+Cache mis à jour : 1 nouveau(x) mail(s) ajouté(s)
+```
+
+---
+
+## Mode 2 — Fichiers .eml locaux
+
+Si vous avez exporté vos mails depuis un client (Thunderbird, Apple Mail…) en format `.eml`, placez-les dans le dossier du projet et lancez :
+
+```bash
+python3 report_local.py
+```
+
+::: {.callout-tip}
+Dans **Thunderbird** : sélectionner les mails → clic droit → Enregistrer sous → choisir le format `.eml`.
+:::
+
+---
+
+## Comprendre le rapport HTML
+
+### Structure de la page
+
+```{mermaid}
+flowchart TD
+    RPT["billets_sncf_rapport.html"]
+    RPT --> A["En-tête\nDate de génération · Nombre de billets"]
+    RPT --> B["Cartes de résumé\nTrain · Voiture · Métro · Repas · Total"]
+    RPT --> C["Panneau Paramètres\nModifier les tarifs et recalculer"]
+    RPT --> D["Graphiques\nDépenses par année · par mois"]
+    RPT --> E["Tableau détaillé\nUn billet par ligne avec cumuls"]
+```
+
+### Les cartes de résumé
+
+| Carte | Couleur | Description |
+|-------|---------|-------------|
+| **Train** | Rouge | Total des billets SNCF |
+| **Voiture** | Bleu | Total kilométrique (aller/retour gare) |
+| **Métro** | Violet | Total tickets ligne 13 |
+| **Repas** | Orange | Total repas du midi |
+| **Total tous frais** | Vert | Somme des quatre postes |
+| **Moyenne / billet** | Gris | Coût moyen d'un déplacement complet |
+
+### Le tableau
+
+Chaque ligne représente **un mail de confirmation** reçu de SNCF Connect.
+
+| Colonne | Description |
+|---------|-------------|
+| **Date achat** | Date de réception du mail de confirmation |
+| **Trajet** | Origine → Destination |
+| **Voyage** | Date du voyage (aller) |
+| **Retour** | Date du retour (si aller-retour dans le même billet) |
+| **Train** | Montant du billet |
+| **Voiture** | Coût kilométrique ce jour |
+| **Métro** | Coût métro ce jour |
+| **Repas** | Repas ce jour (0 € pour les retours Paris → Lisieux) |
+| **Total jour** | Somme des quatre postes |
+| **∑ mois** | Cumul depuis le 1er du mois en cours |
+| **∑ année** | Cumul depuis le 1er janvier de l'année en cours |
+| **∑ total** | Cumul depuis le tout premier billet |
+
+::: {.callout-note}
+Les cumuls **∑ mois**, **∑ année** et **∑ total** sont recalculés dynamiquement selon l'ordre de tri et les filtres actifs.
+:::
+
+### Trier et filtrer
+
+```{mermaid}
+flowchart LR
+    U["Vous"]
+    U -->|"Taper dans la barre"| SRCH["Recherche textuelle\n(trajet, date, gare)"]
+    U -->|"Sélectionner"| FY["Filtre année"]
+    U -->|"Sélectionner"| FM["Filtre mois"]
+    U -->|"Cliquer l'en-tête"| SORT["Tri par colonne\n(1 clic = asc, 2 clics = desc)"]
+    SRCH & FY & FM & SORT --> TABLE["Tableau mis à jour\n+ cumuls recalculés\n+ cartes mises à jour"]
+```
+
+### Recalculer les tarifs
+
+Le panneau **Paramètres** permet de modifier les valeurs et de relancer le calcul **sans toucher au code Python** :
+
+1. Modifier les champs (distance, taux, métro, repas)
+2. Cliquer **Recalculer**
+3. Toutes les colonnes, les cumuls et les graphiques se mettent à jour instantanément
+
+---
+
+## Logique de calcul des coûts
+
+### Règle par type de trajet
+
+```{mermaid}
+flowchart TD
+    M["Mail reçu"]
+    M --> D{{"Direction ?"}}
+
+    D -->|"Lisieux → Paris"| LP["Trajet vers Paris"]
+    D -->|"Paris → Lisieux"| PL["Trajet retour"]
+
+    LP --> LPR{{"Retour inclus ?"}}
+    LPR -->|"Oui\n(même mail)"| AR["Voiture : 2 × 13,5 km × 0,548 €\n= 14,80 €\nMétro : 2 × 2,50 € = 5,00 €\nRepas : 15,00 €\n─────────────\nFrais annexes : 34,80 €"]
+    LPR -->|"Non\n(aller seul)"| AS["Voiture : 1 × 13,5 km × 0,548 €\n= 7,40 €\nMétro : 1 × 2,50 € = 2,50 €\nRepas : 15,00 €\n─────────────\nFrais annexes : 24,90 €"]
+
+    PL --> RS["Voiture : 1 × 13,5 km × 0,548 €\n= 7,40 €\nMétro : 1 × 2,50 € = 2,50 €\nRepas : 0,00 €\n─────────────\nFrais annexes : 9,90 €"]
+
+    style AR fill:#e8f5e9
+    style AS fill:#fff3e0
+    style RS fill:#e3f2fd
+```
+
+### Paramètres par défaut et justification
+
+**Distance kilométrique (13,5 km)**
+Calculée via l'API de routage OSRM (OpenStreetMap) entre les coordonnées GPS de Lessard-et-le-Chêne (49,0747° N, 0,1197° E) et la gare de Lisieux (49,1381° N, 0,2312° E).
+
+**Taux kilométrique (0,548 €/km)**
+Barème kilométrique officiel 2025 (publication DGFIP), pour un véhicule de **5 CV fiscaux**, tranche 0 à 5 000 km par an. Ce barème est défini par l'article 6 B de l'annexe IV du CGI.
+
+| Puissance | 0–5 000 km | 5 001–20 000 km | > 20 000 km |
+|-----------|-----------|-----------------|-------------|
+| 3 CV      | 0,456 €   | 0,273 €         | 0,318 €     |
+| 4 CV      | 0,523 €   | 0,294 €         | 0,352 €     |
+| **5 CV**  | **0,548 €** | **0,328 €**   | **0,386 €** |
+| 6 CV      | 0,574 €   | 0,344 €         | 0,405 €     |
+| 7 CV      | 0,599 €   | 0,360 €         | 0,425 €     |
+
+**Ticket métro (2,50 €)**
+Tarif 2025 IDF Mobilités pour un trajet unitaire en zones 1-3 (ligne 13 Saint-Lazare → Saint-Denis Université). Le tarif plein zones 1-2 (t+) est de 2,15 €, mais Saint-Denis Université est en zone 3.
+
+---
+
+## Modifier les paramètres définitivement
+
+Pour changer les valeurs par défaut de façon permanente, éditez les constantes dans `sncf_report.py` :
+
+```python
+# sncf_report.py — lignes 13-16
+DISTANCE_KM   = 13.5    # ← modifier ici
+RATE_KM       = 0.548   # ← modifier ici (ou choisir dans le tableau ci-dessus)
+METRO_TICKET  = 2.50    # ← modifier ici
+LUNCH_COST    = 15.00   # ← modifier ici
+```
+
+Puis relancez `python3 report_local.py` ou `python3 fetch_and_report.py`.
+
+---
+
+## Dépannage
+
+### Le navigateur ne s'ouvre pas lors de l'autorisation Google
+
+Copiez-collez manuellement l'URL affichée dans le terminal dans votre navigateur.
+
+### `ModuleNotFoundError: No module named 'google_auth_oauthlib'`
+
+```bash
+pip3 install google-auth-oauthlib google-api-python-client
+```
+
+### Le rapport affiche 0 billet
+
+- Mode Gmail : vérifiez que `credentials.json` est bien dans le dossier du projet
+- Mode local : vérifiez que les fichiers `.eml` sont dans le **même dossier** que `report_local.py`
+
+### Les montants affichent `?`
+
+Le script n'a pas trouvé la ligne `Total commande :` dans le corps du mail. Cela peut arriver sur des mails très anciens ou reformatés. Ouvrez le `.eml` correspondant et vérifiez si le texte `Total commande` est présent.
+
+### Réinitialiser le cache
+
+Supprimez `email_cache.json` : le prochain lancement retéléchargera tous les mails.
+
+```bash
+rm "/chemin/vers/billets sncf/email_cache.json"
+```
+
+### Réinitialiser l'autorisation OAuth
+
+Supprimez `token.json` : le prochain lancement rouvrira la page d'autorisation Google.
+
+```bash
+rm "/chemin/vers/billets sncf/token.json"
+```

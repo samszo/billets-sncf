@@ -1,0 +1,377 @@
+---
+title: "Analyse SNCF — Documentation technique"
+subtitle: "Architecture, modules et flux de données"
+author: "samszon@gmail.com"
+date: today
+lang: fr
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Sommaire"
+    theme: cosmo
+    code-fold: true
+    code-tools: true
+    highlight-style: github
+    smooth-scroll: true
+    embed-resources: true
+---
+
+## Vue d'ensemble
+
+Le projet extrait les confirmations de réservation SNCF Connect depuis Gmail, calcule le coût réel de chaque déplacement (billet + voiture + métro + repas) et produit un rapport HTML interactif avec cumuls par mois et par année.
+
+### Architecture des modules
+
+```{mermaid}
+graph TD
+    subgraph Sources["Sources de données"]
+        G[/"Gmail API\n(OAuth2)"/]
+        E[/"Fichiers .eml\n(local)"/]
+    end
+
+    subgraph Core["Module partagé — sncf_report.py"]
+        direction TB
+        H["decode_header_str()"]
+        X["extract_amount()"]
+        P["parse_subject()"]
+        C["compute_extra()"]
+        GH["generate_html()"]
+        CONST["Constantes\nDISTANCE_KM · RATE_KM\nMETRO_TICKET · LUNCH_COST"]
+    end
+
+    subgraph Scripts["Scripts d'entrée"]
+        F["fetch_and_report.py\n(Gmail + cache)"]
+        L["report_local.py\n(fichiers locaux)"]
+    end
+
+    subgraph Persistance["Persistance"]
+        CA[("email_cache.json")]
+        TK[("token.json")]
+        CR[("credentials.json")]
+        RPT[/"billets_sncf_rapport.html"/]
+    end
+
+    G -->|"messages.list\nmessages.get"| F
+    E --> L
+    F -->|parse| H & X & P
+    L -->|parse| H & X & P
+    F & L -->|trip dict| C
+    CONST --> C
+    C -->|car, metro, lunch| GH
+    H & X & P --> GH
+    F <-->|"load / save"| CA
+    F <-->|"refresh token"| TK
+    CR -->|"OAuth flow"| F
+    GH -->|écrit| RPT
+
+    style Core fill:#fff3e0,stroke:#e65100
+    style Sources fill:#e3f2fd,stroke:#1565c0
+    style Scripts fill:#f3e5f5,stroke:#6a1b9a
+    style Persistance fill:#e8f5e9,stroke:#2e7d32
+```
+
+---
+
+## Module `sncf_report.py`
+
+Module partagé importé par les deux scripts. Contient les constantes de coûts, les parseurs et le générateur HTML.
+
+### Constantes configurables
+
+```python
+DISTANCE_KM   = 13.5    # km aller : Lessard-et-le-Chêne → Gare de Lisieux
+RATE_KM       = 0.548   # €/km — barème kilométrique 2025, 5 CV, < 5 000 km/an
+METRO_TICKET  = 2.50    # €/trajet — zones 1-3, ligne 13 (2025)
+LUNCH_COST    = 15.00   # € — repas du midi
+```
+
+| Constante | Valeur | Source |
+|-----------|--------|--------|
+| `DISTANCE_KM` | 13,5 km | Calcul OSRM (OpenStreetMap) |
+| `RATE_KM` | 0,548 €/km | Barème fiscal 2025, 5 CV, tranche 0–5 000 km |
+| `METRO_TICKET` | 2,50 € | Tarif IDF Mobilités 2025, zones 1-3 |
+| `LUNCH_COST` | 15,00 € | Valeur par défaut ajustable |
+
+### Fonctions utilitaires
+
+#### `decode_header_str(raw)`
+
+Décode un en-tête de mail encodé RFC 2047 (ex. `=?UTF-8?Q?...?=`) en chaîne Python lisible.
+
+```python
+def decode_header_str(raw: str) -> str
+```
+
+Gère les en-têtes multi-parties (sujet découpé sur plusieurs lignes encodées) et les encodages inconnus avec un fallback UTF-8.
+
+#### `extract_amount(text)`
+
+Extrait le montant du billet depuis le corps texte du mail.
+
+```python
+def extract_amount(text: str) -> float | None
+```
+
+**Regex utilisée :**
+```
+Total commande\s*:\s*([\d \xa0,]+)\s*\S*€
+```
+
+- Capture les espaces insécables (`\xa0`) présents dans les mails SNCF
+- Convertit la notation française (`37,80`) en float Python (`37.8`)
+- Retourne `None` si aucun montant trouvé
+
+#### `parse_subject(subject)`
+
+Décompose l'objet du mail SNCF en trois champs.
+
+```python
+def parse_subject(subject: str) -> tuple[str, str, str]
+#                                         route  travel  return
+```
+
+**Exemple :**
+```
+"Votre voyage Lisieux - Paris St Lazare, aller le jeudi 9 janvier 2025,
+ retour le jeudi 9 janvier 2025"
+→ route       = "Lisieux - Paris St Lazare"
+→ travel_date = "jeudi 9 janvier 2025"
+→ return_date = "jeudi 9 janvier 2025"
+```
+
+### Calcul des coûts — `compute_extra(trip)`
+
+```{mermaid}
+flowchart LR
+    T["trip dict\nroute · return_date"]
+
+    T --> D{"Direction\nvers Paris ?"}
+    T --> R{"Retour\ndans ce mail ?"}
+
+    D -->|"route commence\npar 'Lisieux'"| YES_P["to_paris = True"]
+    D -->|"route commence\npar 'Paris'"| NO_P["to_paris = False"]
+
+    R -->|"return_date non vide"| TWO["n_legs = 2\n(aller-retour)"]
+    R -->|"return_date vide"| ONE["n_legs = 1\n(aller simple)"]
+
+    TWO & ONE --> CAR["car =\nDISTANCE_KM × n_legs × RATE_KM"]
+    TWO & ONE --> MTR["metro =\nMETRO_TICKET × n_legs"]
+
+    YES_P --> LCH["lunch = LUNCH_COST"]
+    NO_P  --> LCH0["lunch = 0"]
+
+    CAR & MTR & LCH  --> SUM["Retourne\n(car, metro, lunch)"]
+    CAR & MTR & LCH0 --> SUM
+```
+
+**Règles de calcul :**
+
+| Trajet | Voiture | Métro | Repas |
+|--------|---------|-------|-------|
+| Lisieux → Paris **aller+retour** | 2 × 13,5 km × 0,548 € = **14,80 €** | 2 × 2,50 € = **5,00 €** | **15,00 €** |
+| Lisieux → Paris **aller seul** | 1 × 13,5 km × 0,548 € = **7,40 €** | 1 × 2,50 € = **2,50 €** | **15,00 €** |
+| Paris → Lisieux **aller seul** | 1 × 13,5 km × 0,548 € = **7,40 €** | 1 × 2,50 € = **2,50 €** | **0,00 €** |
+
+### Génération HTML — `generate_html(trips, report_file)`
+
+```{mermaid}
+flowchart TD
+    IN["list[trip_dict]"]
+    IN --> EX["Enrichissement\ncompute_extra() sur chaque trip\n→ car, metro, lunch, extra, full"]
+    EX --> ST["Statistiques globales\ntotal_train, total_car,\ntotal_metro, total_lunch, total_all"]
+    EX --> CU["Cumuls progressifs\nc_total, c_year, c_month\n(reset à chaque nouvelle période)"]
+    ST & CU --> AGG["Agrégats périodiques\nby_year, by_month\n(count + sum sur 'full')"]
+    AGG --> JROWS["Sérialisation JSON\nrows[] → BASE_ROWS\nyear_data[], month_data[]"]
+    JROWS --> HTML["Génération f-string HTML\nCSS inline · JSON embarqué\nJS interactif (recalcul côté client)"]
+    HTML --> OUT[/"billets_sncf_rapport.html"/]
+```
+
+Le rapport HTML est **autonome** (embed-resources) : les données JSON sont injectées dans le `<script>` lors de la génération. Toute modification des paramètres (distance, taux...) via l'interface recalcule les coûts **côté client** sans relancer Python.
+
+---
+
+## Script `fetch_and_report.py`
+
+Récupère les mails directement depuis Gmail via l'API officielle avec OAuth 2.0.
+
+### Flux OAuth2
+
+```{mermaid}
+sequenceDiagram
+    actor U as Utilisateur
+    participant S as fetch_and_report.py
+    participant T as token.json
+    participant G as Google Auth
+    participant GM as Gmail API
+
+    U->>S: python3 fetch_and_report.py
+
+    S->>T: Lire token existant ?
+    alt Token valide
+        T-->>S: Credentials OK
+    else Token expiré
+        S->>G: Refresh token
+        G-->>S: Nouveau access_token
+        S->>T: Sauvegarder
+    else Pas de token
+        S->>U: Ouvrir navigateur (flow local)
+        U->>G: Connexion Google + autorisation
+        G-->>S: authorization_code
+        S->>G: Échanger contre tokens
+        G-->>S: access_token + refresh_token
+        S->>T: Sauvegarder token.json
+    end
+
+    S->>GM: messages.list(q=...)
+    GM-->>S: Liste des IDs
+    S->>GM: messages.get(id, format=full)
+    GM-->>S: Message complet (headers + body)
+```
+
+### Système de cache
+
+```{mermaid}
+flowchart TD
+    START([Démarrage]) --> LC["load_cache()\nlire email_cache.json"]
+    LC --> LIST["Gmail API\nmessages.list()\n→ refs[]"]
+    LIST --> DIFF["Différence :\nrefs[id] ∉ cached_gmail_ids ?"]
+
+    DIFF -->|"IDs déjà en cache"| SKIP["Ignorés (0 requête)"]
+    DIFF -->|"Nouveaux IDs"| FETCH["messages.get()\ntéléchargement complet"]
+
+    FETCH --> PARSE["parse_message()\n→ msg_id, trip_dict\n+ _gmail_id interne"]
+    PARSE --> MERGE["cache[msg_id] = trip_dict"]
+    MERGE --> SAVE["save_cache()\nmise à jour email_cache.json"]
+
+    SKIP & SAVE --> DEDUP["Déduplication finale\nsur _gmail_id\n(en cas de Message-ID manquant)"]
+    DEDUP --> SORT["Tri par purchase_date"]
+    SORT --> END([Retourne trips])
+
+    style SKIP fill:#e8f5e9,stroke:#2e7d32
+    style FETCH fill:#fff3e0,stroke:#e65100
+```
+
+**Structure de `email_cache.json` :**
+
+```json
+{
+  "<message-id@connect.sncf>": {
+    "_gmail_id":     "18f3a2b4c5d6e7f8",
+    "subject":       "Votre voyage Lisieux - Paris St Lazare...",
+    "purchase_date": "2025-01-09",
+    "year":          "2025",
+    "month":         "2025-01",
+    "route":         "Lisieux - Paris St Lazare",
+    "travel_date":   "jeudi 9 janvier 2025",
+    "return_date":   "jeudi 9 janvier 2025",
+    "amount":        37.80
+  }
+}
+```
+
+La clé primaire est le **Message-ID RFC 2822** (`<...@connect.sncf>`), stable entre sessions. Le champ `_gmail_id` est l'identifiant interne Gmail, utilisé pour filtrer les `messages.list` lors de la comparaison avec le cache.
+
+### Fonctions internes
+
+| Fonction | Rôle |
+|----------|------|
+| `get_credentials()` | Charge ou renouvelle les credentials OAuth2 |
+| `decode_part(part)` | Décode un fragment base64url (Gmail API payload) |
+| `get_plain_text(payload)` | Parcourt récursivement le payload MIME pour extraire `text/plain` |
+| `parse_message(msg, gmail_id)` | Extrait `(msg_id, trip_dict)` depuis un message Gmail API complet |
+| `fetch_emails(service)` | Orchestre cache + API + déduplication |
+| `print_summary(trips)` | Affiche les totaux par poste et par période dans le terminal |
+
+---
+
+## Script `report_local.py`
+
+Variante sans réseau : lit les fichiers `.eml` présents dans le dossier courant.
+
+```{mermaid}
+flowchart LR
+    DIR[/"*.eml\n(dossier courant)"/] --> G["glob.glob('*.eml')"]
+    G --> PE["parse_eml(filepath)\npour chaque fichier"]
+    PE --> B["emaillib.message_from_binary_file()\n→ headers + body"]
+    B --> DH["decode_header_str()\n→ subject"]
+    B --> EA["extract_amount()\n→ amount"]
+    B --> DT["parsedate_to_datetime()\n→ purchase_date, year, month"]
+    DH --> PS["parse_subject()\n→ route, travel_date, return_date"]
+    DH & EA & DT & PS --> TD["trip_dict"]
+    TD --> CE["compute_extra()\n→ car, metro, lunch"]
+    CE --> GH["generate_html()\n→ rapport HTML"]
+```
+
+Différence clé avec `fetch_and_report.py` : la date est extraite de l'en-tête `Date:` du mail, avec fallback sur le nom de fichier (pattern `YYYY-MM-DD`).
+
+---
+
+## Structure des données
+
+### `trip_dict` — objet central
+
+```{mermaid}
+classDiagram
+    class TripDict {
+        +str subject
+        +str purchase_date
+        +str year
+        +str month
+        +str route
+        +str travel_date
+        +str return_date
+        +float|None amount
+        +str _gmail_id
+        +float car
+        +float metro
+        +float lunch
+        +float extra
+        +float full
+    }
+    note for TripDict "purchase_date : YYYY-MM-DD\nyear  : YYYY\nmonth : YYYY-MM\nextra = car + metro + lunch\nfull  = amount + extra\n_gmail_id : présent uniquement\ndans fetch_and_report.py"
+```
+
+### Pipeline de transformation
+
+```{mermaid}
+flowchart LR
+    RAW["Mail brut\n(bytes RFC 2822)"]
+    -->|"parse + decode"| TRIP["trip_dict\n(champs texte + amount)"]
+    -->|"compute_extra()"| ENRICH["trip_dict enrichi\n(+ car, metro, lunch,\nextra, full)"]
+    -->|"generate_html()"| ROW["row_dict\n(valeurs formatées en str\n+ cumuls c_month, c_year, c_total)"]
+    -->|"json.dumps()"| JS["BASE_ROWS\n(JSON embarqué dans le HTML)"]
+```
+
+---
+
+## Dépendances
+
+### Python stdlib (aucune installation requise)
+
+| Module | Usage |
+|--------|-------|
+| `email` | Parsing MIME, décodage en-têtes RFC 2047 |
+| `re` | Extraction regex des montants et de l'objet |
+| `json` | Cache disque + injection dans le HTML |
+| `base64` | Décodage des parties base64url Gmail API |
+| `collections.defaultdict` | Agrégats par année/mois |
+| `datetime` | Formatage des dates |
+| `glob` | Listing des `.eml` locaux |
+
+### Dépendances externes (Gmail uniquement)
+
+```{mermaid}
+graph LR
+    F["fetch_and_report.py"]
+    -->|"import"| OA["google-auth-oauthlib\ngoogle-auth"]
+    -->|"OAuth2 flow\ntoken refresh"| GA["Google OAuth2\nendpoints"]
+
+    F -->|"import"| GC["google-api-python-client\ngoogleapiclient"]
+    -->|"REST"| GM["Gmail API v1\nimap.gmail.com"]
+```
+
+Installation :
+```bash
+pip3 install google-auth-oauthlib google-api-python-client
+```

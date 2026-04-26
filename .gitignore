@@ -1,0 +1,30 @@
+# Secrets OAuth2 — ne jamais committer
+credentials.json
+token.json
+
+# Cache des mails (données personnelles)
+email_cache.json
+
+# Fichiers mails bruts
+*.eml
+eml_downloaded/
+
+# Rapport HTML généré (hors docs/)
+billets_sncf_rapport.html
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# macOS
+.DS_Store
+
+# Anciens scripts
+generate_report.py
+report_local.py
+
+/.quarto/
+**/*.quarto_ipynb

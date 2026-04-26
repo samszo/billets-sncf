@@ -1,0 +1,31 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Analyse SNCF"
+  description: "Analyse des dépenses de déplacement Lessard-et-le-Chêne ↔ Paris"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Accueil
+      - href: doc_utilisateur.qmd
+        text: Guide utilisateur
+      - href: doc_technique.qmd
+        text: Documentation technique
+    right:
+      - icon: github
+        href: https://github.com/samszo/billets-sncf
+        aria-label: GitHub
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-title: Sommaire
+    smooth-scroll: true
+    code-fold: true
+    code-tools: true
+    highlight-style: github
+    lang: fr

@@ -1,0 +1,156 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Analyse des dépenses SNCF",
+    "section": "",
+    "text": "Ce projet analyse automatiquement les confirmations de réservation SNCF Connect pour calculer le coût réel de chaque déplacement entre Lessard-et-le-Chêne et Paris."
+  },
+  {
+    "objectID": "index.html#coûts-pris-en-compte",
+    "href": "index.html#coûts-pris-en-compte",
+    "title": "Analyse des dépenses SNCF",
+    "section": "Coûts pris en compte",
+    "text": "Coûts pris en compte\n\n\n\n\n\n\n\n\nPoste\nDétail\nTarif 2025\n\n\n\n\n🚄 Train\nBillet SNCF Connect\nVariable\n\n\n🚗 Voiture\nLessard-et-le-Chêne → Gare de Lisieux (13,5 km)\n0,548 €/km\n\n\n🚇 Métro\nSaint-Lazare ↔︎ Saint-Denis Université (ligne 13, zones 1-3)\n2,50 €/trajet\n\n\n🍽️ Repas\nDéjeuner sur place\n15,00 €"
+  },
+  {
+    "objectID": "index.html#fonctionnalités",
+    "href": "index.html#fonctionnalités",
+    "title": "Analyse des dépenses SNCF",
+    "section": "Fonctionnalités",
+    "text": "Fonctionnalités\n\nRécupération automatique des mails depuis Gmail via OAuth2\nCache local : seuls les nouveaux mails sont téléchargés à chaque lancement\nRapport HTML interactif : tri, filtres, recalcul des tarifs en temps réel\nCumuls par mois, par année et depuis le début"
+  },
+  {
+    "objectID": "index.html#documents",
+    "href": "index.html#documents",
+    "title": "Analyse des dépenses SNCF",
+    "section": "Documents",
+    "text": "Documents\n\n\nGuide utilisateur\nComment installer, configurer et utiliser l’outil. Explique les règles de calcul et le fonctionnement du rapport.\n\n\nDocumentation technique\nArchitecture du code, description des modules, diagrammes de flux et de séquence."
+  },
+  {
+    "objectID": "index.html#structure-du-projet",
+    "href": "index.html#structure-du-projet",
+    "title": "Analyse des dépenses SNCF",
+    "section": "Structure du projet",
+    "text": "Structure du projet\nbillets-sncf/\n├── sncf_report.py          # module partagé (coûts + HTML)\n├── fetch_and_report.py     # récupération Gmail (OAuth2 + cache)\n├── report_local.py         # traitement fichiers .eml locaux\n├── _quarto.yml             # configuration du site\n├── index.qmd               # cette page\n├── doc_utilisateur.qmd     # guide utilisateur\n├── doc_technique.qmd       # documentation technique\n└── docs/                   # site généré → GitHub Pages"
+  },
+  {
+    "objectID": "index.html#lancement-rapide",
+    "href": "index.html#lancement-rapide",
+    "title": "Analyse des dépenses SNCF",
+    "section": "Lancement rapide",
+    "text": "Lancement rapide\n# Mode Gmail (recommandé)\npython3 fetch_and_report.py\n\n# Mode fichiers locaux\npython3 report_local.py"
+  },
+  {
+    "objectID": "doc_technique.html",
+    "href": "doc_technique.html",
+    "title": "Analyse SNCF — Documentation technique",
+    "section": "",
+    "text": "Le projet extrait les confirmations de réservation SNCF Connect depuis Gmail, calcule le coût réel de chaque déplacement (billet + voiture + métro + repas) et produit un rapport HTML interactif avec cumuls par mois et par année.\n\n\n\n\n\n\n\ngraph TD\n    subgraph Sources[\"Sources de données\"]\n        G[/\"Gmail API\\n(OAuth2)\"/]\n        E[/\"Fichiers .eml\\n(local)\"/]\n    end\n\n    subgraph Core[\"Module partagé — sncf_report.py\"]\n        direction TB\n        H[\"decode_header_str()\"]\n        X[\"extract_amount()\"]\n        P[\"parse_subject()\"]\n        C[\"compute_extra()\"]\n        GH[\"generate_html()\"]\n        CONST[\"Constantes\\nDISTANCE_KM · RATE_KM\\nMETRO_TICKET · LUNCH_COST\"]\n    end\n\n    subgraph Scripts[\"Scripts d'entrée\"]\n        F[\"fetch_and_report.py\\n(Gmail + cache)\"]\n        L[\"report_local.py\\n(fichiers locaux)\"]\n    end\n\n    subgraph Persistance[\"Persistance\"]\n        CA[(\"email_cache.json\")]\n        TK[(\"token.json\")]\n        CR[(\"credentials.json\")]\n        RPT[/\"billets_sncf_rapport.html\"/]\n    end\n\n    G --&gt;|\"messages.list\\nmessages.get\"| F\n    E --&gt; L\n    F --&gt;|parse| H & X & P\n    L --&gt;|parse| H & X & P\n    F & L --&gt;|trip dict| C\n    CONST --&gt; C\n    C --&gt;|car, metro, lunch| GH\n    H & X & P --&gt; GH\n    F &lt;--&gt;|\"load / save\"| CA\n    F &lt;--&gt;|\"refresh token\"| TK\n    CR --&gt;|\"OAuth flow\"| F\n    GH --&gt;|écrit| RPT\n\n    style Core fill:#fff3e0,stroke:#e65100\n    style Sources fill:#e3f2fd,stroke:#1565c0\n    style Scripts fill:#f3e5f5,stroke:#6a1b9a\n    style Persistance fill:#e8f5e9,stroke:#2e7d32"
+  },
+  {
+    "objectID": "doc_technique.html#vue-densemble",
+    "href": "doc_technique.html#vue-densemble",
+    "title": "Analyse SNCF — Documentation technique",
+    "section": "",
+    "text": "Le projet extrait les confirmations de réservation SNCF Connect depuis Gmail, calcule le coût réel de chaque déplacement (billet + voiture + métro + repas) et produit un rapport HTML interactif avec cumuls par mois et par année.\n\n\n\n\n\n\n\ngraph TD\n    subgraph Sources[\"Sources de données\"]\n        G[/\"Gmail API\\n(OAuth2)\"/]\n        E[/\"Fichiers .eml\\n(local)\"/]\n    end\n\n    subgraph Core[\"Module partagé — sncf_report.py\"]\n        direction TB\n        H[\"decode_header_str()\"]\n        X[\"extract_amount()\"]\n        P[\"parse_subject()\"]\n        C[\"compute_extra()\"]\n        GH[\"generate_html()\"]\n        CONST[\"Constantes\\nDISTANCE_KM · RATE_KM\\nMETRO_TICKET · LUNCH_COST\"]\n    end\n\n    subgraph Scripts[\"Scripts d'entrée\"]\n        F[\"fetch_and_report.py\\n(Gmail + cache)\"]\n        L[\"report_local.py\\n(fichiers locaux)\"]\n    end\n\n    subgraph Persistance[\"Persistance\"]\n        CA[(\"email_cache.json\")]\n        TK[(\"token.json\")]\n        CR[(\"credentials.json\")]\n        RPT[/\"billets_sncf_rapport.html\"/]\n    end\n\n    G --&gt;|\"messages.list\\nmessages.get\"| F\n    E --&gt; L\n    F --&gt;|parse| H & X & P\n    L --&gt;|parse| H & X & P\n    F & L --&gt;|trip dict| C\n    CONST --&gt; C\n    C --&gt;|car, metro, lunch| GH\n    H & X & P --&gt; GH\n    F &lt;--&gt;|\"load / save\"| CA\n    F &lt;--&gt;|\"refresh token\"| TK\n    CR --&gt;|\"OAuth flow\"| F\n    GH --&gt;|écrit| RPT\n\n    style Core fill:#fff3e0,stroke:#e65100\n    style Sources fill:#e3f2fd,stroke:#1565c0\n    style Scripts fill:#f3e5f5,stroke:#6a1b9a\n    style Persistance fill:#e8f5e9,stroke:#2e7d32"
+  },
+  {
+    "objectID": "doc_technique.html#module-sncf_report.py",
+    "href": "doc_technique.html#module-sncf_report.py",
+    "title": "Analyse SNCF — Documentation technique",
+    "section": "Module sncf_report.py",
+    "text": "Module sncf_report.py\nModule partagé importé par les deux scripts. Contient les constantes de coûts, les parseurs et le générateur HTML.\n\nConstantes configurables\nDISTANCE_KM   = 13.5    # km aller : Lessard-et-le-Chêne → Gare de Lisieux\nRATE_KM       = 0.548   # €/km — barème kilométrique 2025, 5 CV, &lt; 5 000 km/an\nMETRO_TICKET  = 2.50    # €/trajet — zones 1-3, ligne 13 (2025)\nLUNCH_COST    = 15.00   # € — repas du midi\n\n\n\n\n\n\n\n\nConstante\nValeur\nSource\n\n\n\n\nDISTANCE_KM\n13,5 km\nCalcul OSRM (OpenStreetMap)\n\n\nRATE_KM\n0,548 €/km\nBarème fiscal 2025, 5 CV, tranche 0–5 000 km\n\n\nMETRO_TICKET\n2,50 €\nTarif IDF Mobilités 2025, zones 1-3\n\n\nLUNCH_COST\n15,00 €\nValeur par défaut ajustable\n\n\n\n\n\nFonctions utilitaires\n\ndecode_header_str(raw)\nDécode un en-tête de mail encodé RFC 2047 (ex. =?UTF-8?Q?...?=) en chaîne Python lisible.\ndef decode_header_str(raw: str) -&gt; str\nGère les en-têtes multi-parties (sujet découpé sur plusieurs lignes encodées) et les encodages inconnus avec un fallback UTF-8.\n\n\nextract_amount(text)\nExtrait le montant du billet depuis le corps texte du mail.\ndef extract_amount(text: str) -&gt; float | None\nRegex utilisée :\nTotal commande\\s*:\\s*([\\d \\xa0,]+)\\s*\\S*€\n\nCapture les espaces insécables (\\xa0) présents dans les mails SNCF\nConvertit la notation française (37,80) en float Python (37.8)\nRetourne None si aucun montant trouvé\n\n\n\nparse_subject(subject)\nDécompose l’objet du mail SNCF en trois champs.\ndef parse_subject(subject: str) -&gt; tuple[str, str, str]\n#                                         route  travel  return\nExemple :\n\"Votre voyage Lisieux - Paris St Lazare, aller le jeudi 9 janvier 2025,\n retour le jeudi 9 janvier 2025\"\n→ route       = \"Lisieux - Paris St Lazare\"\n→ travel_date = \"jeudi 9 janvier 2025\"\n→ return_date = \"jeudi 9 janvier 2025\"\n\n\n\nCalcul des coûts — compute_extra(trip)\n\n\n\n\n\nflowchart LR\n    T[\"trip dict\\nroute · return_date\"]\n\n    T --&gt; D{\"Direction\\nvers Paris ?\"}\n    T --&gt; R{\"Retour\\ndans ce mail ?\"}\n\n    D --&gt;|\"route commence\\npar 'Lisieux'\"| YES_P[\"to_paris = True\"]\n    D --&gt;|\"route commence\\npar 'Paris'\"| NO_P[\"to_paris = False\"]\n\n    R --&gt;|\"return_date non vide\"| TWO[\"n_legs = 2\\n(aller-retour)\"]\n    R --&gt;|\"return_date vide\"| ONE[\"n_legs = 1\\n(aller simple)\"]\n\n    TWO & ONE --&gt; CAR[\"car =\\nDISTANCE_KM × n_legs × RATE_KM\"]\n    TWO & ONE --&gt; MTR[\"metro =\\nMETRO_TICKET × n_legs\"]\n\n    YES_P --&gt; LCH[\"lunch = LUNCH_COST\"]\n    NO_P  --&gt; LCH0[\"lunch = 0\"]\n\n    CAR & MTR & LCH  --&gt; SUM[\"Retourne\\n(car, metro, lunch)\"]\n    CAR & MTR & LCH0 --&gt; SUM\n\n\n\n\n\n\nRègles de calcul :\n\n\n\n\n\n\n\n\n\nTrajet\nVoiture\nMétro\nRepas\n\n\n\n\nLisieux → Paris aller+retour\n2 × 13,5 km × 0,548 € = 14,80 €\n2 × 2,50 € = 5,00 €\n15,00 €\n\n\nLisieux → Paris aller seul\n1 × 13,5 km × 0,548 € = 7,40 €\n1 × 2,50 € = 2,50 €\n15,00 €\n\n\nParis → Lisieux aller seul\n1 × 13,5 km × 0,548 € = 7,40 €\n1 × 2,50 € = 2,50 €\n0,00 €\n\n\n\n\n\nGénération HTML — generate_html(trips, report_file)\n\n\n\n\n\nflowchart TD\n    IN[\"list[trip_dict]\"]\n    IN --&gt; EX[\"Enrichissement\\ncompute_extra() sur chaque trip\\n→ car, metro, lunch, extra, full\"]\n    EX --&gt; ST[\"Statistiques globales\\ntotal_train, total_car,\\ntotal_metro, total_lunch, total_all\"]\n    EX --&gt; CU[\"Cumuls progressifs\\nc_total, c_year, c_month\\n(reset à chaque nouvelle période)\"]\n    ST & CU --&gt; AGG[\"Agrégats périodiques\\nby_year, by_month\\n(count + sum sur 'full')\"]\n    AGG --&gt; JROWS[\"Sérialisation JSON\\nrows[] → BASE_ROWS\\nyear_data[], month_data[]\"]\n    JROWS --&gt; HTML[\"Génération f-string HTML\\nCSS inline · JSON embarqué\\nJS interactif (recalcul côté client)\"]\n    HTML --&gt; OUT[/\"billets_sncf_rapport.html\"/]\n\n\n\n\n\n\nLe rapport HTML est autonome (embed-resources) : les données JSON sont injectées dans le &lt;script&gt; lors de la génération. Toute modification des paramètres (distance, taux…) via l’interface recalcule les coûts côté client sans relancer Python."
+  },
+  {
+    "objectID": "doc_technique.html#script-fetch_and_report.py",
+    "href": "doc_technique.html#script-fetch_and_report.py",
+    "title": "Analyse SNCF — Documentation technique",
+    "section": "Script fetch_and_report.py",
+    "text": "Script fetch_and_report.py\nRécupère les mails directement depuis Gmail via l’API officielle avec OAuth 2.0.\n\nFlux OAuth2\n\n\n\n\n\nsequenceDiagram\n    actor U as Utilisateur\n    participant S as fetch_and_report.py\n    participant T as token.json\n    participant G as Google Auth\n    participant GM as Gmail API\n\n    U-&gt;&gt;S: python3 fetch_and_report.py\n\n    S-&gt;&gt;T: Lire token existant ?\n    alt Token valide\n        T--&gt;&gt;S: Credentials OK\n    else Token expiré\n        S-&gt;&gt;G: Refresh token\n        G--&gt;&gt;S: Nouveau access_token\n        S-&gt;&gt;T: Sauvegarder\n    else Pas de token\n        S-&gt;&gt;U: Ouvrir navigateur (flow local)\n        U-&gt;&gt;G: Connexion Google + autorisation\n        G--&gt;&gt;S: authorization_code\n        S-&gt;&gt;G: Échanger contre tokens\n        G--&gt;&gt;S: access_token + refresh_token\n        S-&gt;&gt;T: Sauvegarder token.json\n    end\n\n    S-&gt;&gt;GM: messages.list(q=...)\n    GM--&gt;&gt;S: Liste des IDs\n    S-&gt;&gt;GM: messages.get(id, format=full)\n    GM--&gt;&gt;S: Message complet (headers + body)\n\n\n\n\n\n\n\n\nSystème de cache\n\n\n\n\n\nflowchart TD\n    START([Démarrage]) --&gt; LC[\"load_cache()\\nlire email_cache.json\"]\n    LC --&gt; LIST[\"Gmail API\\nmessages.list()\\n→ refs[]\"]\n    LIST --&gt; DIFF[\"Différence :\\nrefs[id] ∉ cached_gmail_ids ?\"]\n\n    DIFF --&gt;|\"IDs déjà en cache\"| SKIP[\"Ignorés (0 requête)\"]\n    DIFF --&gt;|\"Nouveaux IDs\"| FETCH[\"messages.get()\\ntéléchargement complet\"]\n\n    FETCH --&gt; PARSE[\"parse_message()\\n→ msg_id, trip_dict\\n+ _gmail_id interne\"]\n    PARSE --&gt; MERGE[\"cache[msg_id] = trip_dict\"]\n    MERGE --&gt; SAVE[\"save_cache()\\nmise à jour email_cache.json\"]\n\n    SKIP & SAVE --&gt; DEDUP[\"Déduplication finale\\nsur _gmail_id\\n(en cas de Message-ID manquant)\"]\n    DEDUP --&gt; SORT[\"Tri par purchase_date\"]\n    SORT --&gt; END([Retourne trips])\n\n    style SKIP fill:#e8f5e9,stroke:#2e7d32\n    style FETCH fill:#fff3e0,stroke:#e65100\n\n\n\n\n\n\nStructure de email_cache.json :\n{\n  \"&lt;message-id@connect.sncf&gt;\": {\n    \"_gmail_id\":     \"18f3a2b4c5d6e7f8\",\n    \"subject\":       \"Votre voyage Lisieux - Paris St Lazare...\",\n    \"purchase_date\": \"2025-01-09\",\n    \"year\":          \"2025\",\n    \"month\":         \"2025-01\",\n    \"route\":         \"Lisieux - Paris St Lazare\",\n    \"travel_date\":   \"jeudi 9 janvier 2025\",\n    \"return_date\":   \"jeudi 9 janvier 2025\",\n    \"amount\":        37.80\n  }\n}\nLa clé primaire est le Message-ID RFC 2822 (&lt;...@connect.sncf&gt;), stable entre sessions. Le champ _gmail_id est l’identifiant interne Gmail, utilisé pour filtrer les messages.list lors de la comparaison avec le cache.\n\n\nFonctions internes\n\n\n\n\n\n\n\nFonction\nRôle\n\n\n\n\nget_credentials()\nCharge ou renouvelle les credentials OAuth2\n\n\ndecode_part(part)\nDécode un fragment base64url (Gmail API payload)\n\n\nget_plain_text(payload)\nParcourt récursivement le payload MIME pour extraire text/plain\n\n\nparse_message(msg, gmail_id)\nExtrait (msg_id, trip_dict) depuis un message Gmail API complet\n\n\nfetch_emails(service)\nOrchestre cache + API + déduplication\n\n\nprint_summary(trips)\nAffiche les totaux par poste et par période dans le terminal"
+  },
+  {
+    "objectID": "doc_technique.html#script-report_local.py",
+    "href": "doc_technique.html#script-report_local.py",
+    "title": "Analyse SNCF — Documentation technique",
+    "section": "Script report_local.py",
+    "text": "Script report_local.py\nVariante sans réseau : lit les fichiers .eml présents dans le dossier courant.\n\n\n\n\n\nflowchart LR\n    DIR[/\"*.eml\\n(dossier courant)\"/] --&gt; G[\"glob.glob('*.eml')\"]\n    G --&gt; PE[\"parse_eml(filepath)\\npour chaque fichier\"]\n    PE --&gt; B[\"emaillib.message_from_binary_file()\\n→ headers + body\"]\n    B --&gt; DH[\"decode_header_str()\\n→ subject\"]\n    B --&gt; EA[\"extract_amount()\\n→ amount\"]\n    B --&gt; DT[\"parsedate_to_datetime()\\n→ purchase_date, year, month\"]\n    DH --&gt; PS[\"parse_subject()\\n→ route, travel_date, return_date\"]\n    DH & EA & DT & PS --&gt; TD[\"trip_dict\"]\n    TD --&gt; CE[\"compute_extra()\\n→ car, metro, lunch\"]\n    CE --&gt; GH[\"generate_html()\\n→ rapport HTML\"]\n\n\n\n\n\n\nDifférence clé avec fetch_and_report.py : la date est extraite de l’en-tête Date: du mail, avec fallback sur le nom de fichier (pattern YYYY-MM-DD)."
+  },
+  {
+    "objectID": "doc_technique.html#structure-des-données",
+    "href": "doc_technique.html#structure-des-données",
+    "title": "Analyse SNCF — Documentation technique",
+    "section": "Structure des données",
+    "text": "Structure des données\n\ntrip_dict — objet central\n\n\n\n\n\nclassDiagram\n    class TripDict {\n        +str subject\n        +str purchase_date\n        +str year\n        +str month\n        +str route\n        +str travel_date\n        +str return_date\n        +float|None amount\n        +str _gmail_id\n        +float car\n        +float metro\n        +float lunch\n        +float extra\n        +float full\n    }\n    note for TripDict \"purchase_date : YYYY-MM-DD\\nyear  : YYYY\\nmonth : YYYY-MM\\nextra = car + metro + lunch\\nfull  = amount + extra\\n_gmail_id : présent uniquement\\ndans fetch_and_report.py\"\n\n\n\n\n\n\n\n\nPipeline de transformation\n\n\n\n\n\nflowchart LR\n    RAW[\"Mail brut\\n(bytes RFC 2822)\"]\n    --&gt;|\"parse + decode\"| TRIP[\"trip_dict\\n(champs texte + amount)\"]\n    --&gt;|\"compute_extra()\"| ENRICH[\"trip_dict enrichi\\n(+ car, metro, lunch,\\nextra, full)\"]\n    --&gt;|\"generate_html()\"| ROW[\"row_dict\\n(valeurs formatées en str\\n+ cumuls c_month, c_year, c_total)\"]\n    --&gt;|\"json.dumps()\"| JS[\"BASE_ROWS\\n(JSON embarqué dans le HTML)\"]"
+  },
+  {
+    "objectID": "doc_technique.html#dépendances",
+    "href": "doc_technique.html#dépendances",
+    "title": "Analyse SNCF — Documentation technique",
+    "section": "Dépendances",
+    "text": "Dépendances\n\nPython stdlib (aucune installation requise)\n\n\n\nModule\nUsage\n\n\n\n\nemail\nParsing MIME, décodage en-têtes RFC 2047\n\n\nre\nExtraction regex des montants et de l’objet\n\n\njson\nCache disque + injection dans le HTML\n\n\nbase64\nDécodage des parties base64url Gmail API\n\n\ncollections.defaultdict\nAgrégats par année/mois\n\n\ndatetime\nFormatage des dates\n\n\nglob\nListing des .eml locaux\n\n\n\n\n\nDépendances externes (Gmail uniquement)\n\n\n\n\n\ngraph LR\n    F[\"fetch_and_report.py\"]\n    --&gt;|\"import\"| OA[\"google-auth-oauthlib\\ngoogle-auth\"]\n    --&gt;|\"OAuth2 flow\\ntoken refresh\"| GA[\"Google OAuth2\\nendpoints\"]\n\n    F --&gt;|\"import\"| GC[\"google-api-python-client\\ngoogleapiclient\"]\n    --&gt;|\"REST\"| GM[\"Gmail API v1\\nimap.gmail.com\"]\n\n\n\n\n\n\nInstallation :\npip3 install google-auth-oauthlib google-api-python-client"
+  },
+  {
+    "objectID": "doc_utilisateur.html",
+    "href": "doc_utilisateur.html",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "",
+    "text": "Ce projet analyse automatiquement vos confirmations de réservation SNCF Connect pour calculer le coût réel de chaque déplacement Lessard-et-le-Chêne ↔︎ Paris, en additionnant :\n\nle billet de train SNCF\nle trajet en voiture jusqu’à la gare de Lisieux\nles tickets de métro (ligne 13, Saint-Lazare ↔︎ Saint-Denis Université)\nle repas du midi\n\nLe résultat est un rapport HTML interactif consultable dans n’importe quel navigateur."
+  },
+  {
+    "objectID": "doc_utilisateur.html#présentation",
+    "href": "doc_utilisateur.html#présentation",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "",
+    "text": "Ce projet analyse automatiquement vos confirmations de réservation SNCF Connect pour calculer le coût réel de chaque déplacement Lessard-et-le-Chêne ↔︎ Paris, en additionnant :\n\nle billet de train SNCF\nle trajet en voiture jusqu’à la gare de Lisieux\nles tickets de métro (ligne 13, Saint-Lazare ↔︎ Saint-Denis Université)\nle repas du midi\n\nLe résultat est un rapport HTML interactif consultable dans n’importe quel navigateur."
+  },
+  {
+    "objectID": "doc_utilisateur.html#prérequis",
+    "href": "doc_utilisateur.html#prérequis",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "Prérequis",
+    "text": "Prérequis\n\nLogiciels\n\nPython 3.9+ — vérifier avec python3 --version\nQuarto 1.4+ (pour lire ce document) — quarto --version\n\n\n\nFichiers du projet\nbillets sncf/\n├── sncf_report.py          ← module partagé (coûts + HTML)\n├── fetch_and_report.py     ← récupération Gmail (mode principal)\n├── report_local.py         ← traitement fichiers .eml locaux\n├── credentials.json        ← à créer (voir section Setup Gmail)\n├── token.json              ← créé automatiquement au 1er lancement\n├── email_cache.json        ← créé automatiquement (cache des mails)\n└── billets_sncf_rapport.html  ← rapport généré"
+  },
+  {
+    "objectID": "doc_utilisateur.html#mode-1-récupération-depuis-gmail-recommandé",
+    "href": "doc_utilisateur.html#mode-1-récupération-depuis-gmail-recommandé",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "Mode 1 — Récupération depuis Gmail (recommandé)",
+    "text": "Mode 1 — Récupération depuis Gmail (recommandé)\nCe mode télécharge directement les mails depuis votre boîte Gmail, en ne récupérant que les nouveaux messages à chaque lancement grâce au cache.\n\nÉtape 1 — Configurer l’API Gmail\n\n\n\n\n\nsequenceDiagram\n    actor U as Vous\n    participant GC as Google Cloud Console\n    participant FS as Dossier projet\n\n    U-&gt;&gt;GC: 1. Créer un projet \"billets-sncf\"\n    U-&gt;&gt;GC: 2. APIs & Services → Bibliothèque\\n→ Activer \"Gmail API\"\n    U-&gt;&gt;GC: 3. Identifiants → Créer\\n→ ID client OAuth 2.0\\n→ Type : Application de bureau\n    GC--&gt;&gt;U: Fichier JSON téléchargé\n    U-&gt;&gt;FS: 4. Renommer en \"credentials.json\"\\n   et copier dans le dossier projet\n\n\n\n\n\n\n\n\n\n\n\n\nCette configuration n’est nécessaire qu’une seule fois. Le fichier token.json généré au premier lancement évite de re-autoriser l’application à chaque fois.\n\n\n\n\n\nÉtape 2 — Installer les dépendances\npip3 install google-auth-oauthlib google-api-python-client\n\n\nÉtape 3 — Premier lancement\ncd \"/chemin/vers/billets sncf\"\npython3 fetch_and_report.py\nUn navigateur s’ouvre automatiquement pour vous demander d’autoriser l’accès en lecture à votre Gmail.\n\n\n\n\n\nsequenceDiagram\n    actor U as Vous\n    participant S as Script Python\n    participant B as Navigateur\n    participant G as Google\n\n    U-&gt;&gt;S: python3 fetch_and_report.py\n    S-&gt;&gt;B: Ouvrir page d'autorisation Google\n    B-&gt;&gt;G: Connexion avec samszon@gmail.com\n    G--&gt;&gt;B: \"Autoriser l'accès en lecture ?\"\n    U-&gt;&gt;B: Cliquer \"Autoriser\"\n    G--&gt;&gt;S: Token d'accès\n    S-&gt;&gt;S: Sauvegarder token.json\n    S-&gt;&gt;G: Rechercher mails SNCF\n    G--&gt;&gt;S: 216 messages trouvés\n    S-&gt;&gt;S: Télécharger + mettre en cache\n    S-&gt;&gt;S: Générer rapport HTML\n    S-&gt;&gt;B: Ouvrir billets_sncf_rapport.html\n\n\n\n\n\n\n\n\nLancements suivants\nÀ chaque nouveau lancement, seuls les mails reçus depuis le dernier cache sont téléchargés :\n============================================================\n  Billets SNCF — Récupération via Gmail API (OAuth2)\n============================================================\nRecherche : from:noreply@connect.sncf subject:\"Votre voyage\"\n216 message(s) trouvé(s) sur Gmail.\n  216 en cache  ·  0 à télécharger\nCache à jour, aucun nouveau mail.\nSi de nouveaux billets ont été reçus :\n217 message(s) trouvé(s) sur Gmail.\n  216 en cache  ·  1 à télécharger\n  téléchargé 1/1…\nCache mis à jour : 1 nouveau(x) mail(s) ajouté(s)"
+  },
+  {
+    "objectID": "doc_utilisateur.html#mode-2-fichiers-.eml-locaux",
+    "href": "doc_utilisateur.html#mode-2-fichiers-.eml-locaux",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "Mode 2 — Fichiers .eml locaux",
+    "text": "Mode 2 — Fichiers .eml locaux\nSi vous avez exporté vos mails depuis un client (Thunderbird, Apple Mail…) en format .eml, placez-les dans le dossier du projet et lancez :\npython3 report_local.py\n\n\n\n\n\n\nDans Thunderbird : sélectionner les mails → clic droit → Enregistrer sous → choisir le format .eml."
+  },
+  {
+    "objectID": "doc_utilisateur.html#comprendre-le-rapport-html",
+    "href": "doc_utilisateur.html#comprendre-le-rapport-html",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "Comprendre le rapport HTML",
+    "text": "Comprendre le rapport HTML\n\nStructure de la page\n\n\n\n\n\nflowchart TD\n    RPT[\"billets_sncf_rapport.html\"]\n    RPT --&gt; A[\"En-tête\\nDate de génération · Nombre de billets\"]\n    RPT --&gt; B[\"Cartes de résumé\\nTrain · Voiture · Métro · Repas · Total\"]\n    RPT --&gt; C[\"Panneau Paramètres\\nModifier les tarifs et recalculer\"]\n    RPT --&gt; D[\"Graphiques\\nDépenses par année · par mois\"]\n    RPT --&gt; E[\"Tableau détaillé\\nUn billet par ligne avec cumuls\"]\n\n\n\n\n\n\n\n\nLes cartes de résumé\n\n\n\nCarte\nCouleur\nDescription\n\n\n\n\nTrain\nRouge\nTotal des billets SNCF\n\n\nVoiture\nBleu\nTotal kilométrique (aller/retour gare)\n\n\nMétro\nViolet\nTotal tickets ligne 13\n\n\nRepas\nOrange\nTotal repas du midi\n\n\nTotal tous frais\nVert\nSomme des quatre postes\n\n\nMoyenne / billet\nGris\nCoût moyen d’un déplacement complet\n\n\n\n\n\nLe tableau\nChaque ligne représente un mail de confirmation reçu de SNCF Connect.\n\n\n\nColonne\nDescription\n\n\n\n\nDate achat\nDate de réception du mail de confirmation\n\n\nTrajet\nOrigine → Destination\n\n\nVoyage\nDate du voyage (aller)\n\n\nRetour\nDate du retour (si aller-retour dans le même billet)\n\n\nTrain\nMontant du billet\n\n\nVoiture\nCoût kilométrique ce jour\n\n\nMétro\nCoût métro ce jour\n\n\nRepas\nRepas ce jour (0 € pour les retours Paris → Lisieux)\n\n\nTotal jour\nSomme des quatre postes\n\n\n∑ mois\nCumul depuis le 1er du mois en cours\n\n\n∑ année\nCumul depuis le 1er janvier de l’année en cours\n\n\n∑ total\nCumul depuis le tout premier billet\n\n\n\n\n\n\n\n\n\nLes cumuls ∑ mois, ∑ année et ∑ total sont recalculés dynamiquement selon l’ordre de tri et les filtres actifs.\n\n\n\n\n\nTrier et filtrer\n\n\n\n\n\nflowchart LR\n    U[\"Vous\"]\n    U --&gt;|\"Taper dans la barre\"| SRCH[\"Recherche textuelle\\n(trajet, date, gare)\"]\n    U --&gt;|\"Sélectionner\"| FY[\"Filtre année\"]\n    U --&gt;|\"Sélectionner\"| FM[\"Filtre mois\"]\n    U --&gt;|\"Cliquer l'en-tête\"| SORT[\"Tri par colonne\\n(1 clic = asc, 2 clics = desc)\"]\n    SRCH & FY & FM & SORT --&gt; TABLE[\"Tableau mis à jour\\n+ cumuls recalculés\\n+ cartes mises à jour\"]\n\n\n\n\n\n\n\n\nRecalculer les tarifs\nLe panneau Paramètres permet de modifier les valeurs et de relancer le calcul sans toucher au code Python :\n\nModifier les champs (distance, taux, métro, repas)\nCliquer Recalculer\nToutes les colonnes, les cumuls et les graphiques se mettent à jour instantanément"
+  },
+  {
+    "objectID": "doc_utilisateur.html#logique-de-calcul-des-coûts",
+    "href": "doc_utilisateur.html#logique-de-calcul-des-coûts",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "Logique de calcul des coûts",
+    "text": "Logique de calcul des coûts\n\nRègle par type de trajet\n\n\n\n\n\nflowchart TD\n    M[\"Mail reçu\"]\n    M --&gt; D{{\"Direction ?\"}}\n\n    D --&gt;|\"Lisieux → Paris\"| LP[\"Trajet vers Paris\"]\n    D --&gt;|\"Paris → Lisieux\"| PL[\"Trajet retour\"]\n\n    LP --&gt; LPR{{\"Retour inclus ?\"}}\n    LPR --&gt;|\"Oui\\n(même mail)\"| AR[\"Voiture : 2 × 13,5 km × 0,548 €\\n= 14,80 €\\nMétro : 2 × 2,50 € = 5,00 €\\nRepas : 15,00 €\\n─────────────\\nFrais annexes : 34,80 €\"]\n    LPR --&gt;|\"Non\\n(aller seul)\"| AS[\"Voiture : 1 × 13,5 km × 0,548 €\\n= 7,40 €\\nMétro : 1 × 2,50 € = 2,50 €\\nRepas : 15,00 €\\n─────────────\\nFrais annexes : 24,90 €\"]\n\n    PL --&gt; RS[\"Voiture : 1 × 13,5 km × 0,548 €\\n= 7,40 €\\nMétro : 1 × 2,50 € = 2,50 €\\nRepas : 0,00 €\\n─────────────\\nFrais annexes : 9,90 €\"]\n\n    style AR fill:#e8f5e9\n    style AS fill:#fff3e0\n    style RS fill:#e3f2fd\n\n\n\n\n\n\n\n\nParamètres par défaut et justification\nDistance kilométrique (13,5 km) Calculée via l’API de routage OSRM (OpenStreetMap) entre les coordonnées GPS de Lessard-et-le-Chêne (49,0747° N, 0,1197° E) et la gare de Lisieux (49,1381° N, 0,2312° E).\nTaux kilométrique (0,548 €/km) Barème kilométrique officiel 2025 (publication DGFIP), pour un véhicule de 5 CV fiscaux, tranche 0 à 5 000 km par an. Ce barème est défini par l’article 6 B de l’annexe IV du CGI.\n\n\n\nPuissance\n0–5 000 km\n5 001–20 000 km\n&gt; 20 000 km\n\n\n\n\n3 CV\n0,456 €\n0,273 €\n0,318 €\n\n\n4 CV\n0,523 €\n0,294 €\n0,352 €\n\n\n5 CV\n0,548 €\n0,328 €\n0,386 €\n\n\n6 CV\n0,574 €\n0,344 €\n0,405 €\n\n\n7 CV\n0,599 €\n0,360 €\n0,425 €\n\n\n\nTicket métro (2,50 €) Tarif 2025 IDF Mobilités pour un trajet unitaire en zones 1-3 (ligne 13 Saint-Lazare → Saint-Denis Université). Le tarif plein zones 1-2 (t+) est de 2,15 €, mais Saint-Denis Université est en zone 3."
+  },
+  {
+    "objectID": "doc_utilisateur.html#modifier-les-paramètres-définitivement",
+    "href": "doc_utilisateur.html#modifier-les-paramètres-définitivement",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "Modifier les paramètres définitivement",
+    "text": "Modifier les paramètres définitivement\nPour changer les valeurs par défaut de façon permanente, éditez les constantes dans sncf_report.py :\n# sncf_report.py — lignes 13-16\nDISTANCE_KM   = 13.5    # ← modifier ici\nRATE_KM       = 0.548   # ← modifier ici (ou choisir dans le tableau ci-dessus)\nMETRO_TICKET  = 2.50    # ← modifier ici\nLUNCH_COST    = 15.00   # ← modifier ici\nPuis relancez python3 report_local.py ou python3 fetch_and_report.py."
+  },
+  {
+    "objectID": "doc_utilisateur.html#dépannage",
+    "href": "doc_utilisateur.html#dépannage",
+    "title": "Analyse SNCF — Guide utilisateur",
+    "section": "Dépannage",
+    "text": "Dépannage\n\nLe navigateur ne s’ouvre pas lors de l’autorisation Google\nCopiez-collez manuellement l’URL affichée dans le terminal dans votre navigateur.\n\n\nModuleNotFoundError: No module named 'google_auth_oauthlib'\npip3 install google-auth-oauthlib google-api-python-client\n\n\nLe rapport affiche 0 billet\n\nMode Gmail : vérifiez que credentials.json est bien dans le dossier du projet\nMode local : vérifiez que les fichiers .eml sont dans le même dossier que report_local.py\n\n\n\nLes montants affichent ?\nLe script n’a pas trouvé la ligne Total commande : dans le corps du mail. Cela peut arriver sur des mails très anciens ou reformatés. Ouvrez le .eml correspondant et vérifiez si le texte Total commande est présent.\n\n\nRéinitialiser le cache\nSupprimez email_cache.json : le prochain lancement retéléchargera tous les mails.\nrm \"/chemin/vers/billets sncf/email_cache.json\"\n\n\nRéinitialiser l’autorisation OAuth\nSupprimez token.json : le prochain lancement rouvrira la page d’autorisation Google.\nrm \"/chemin/vers/billets sncf/token.json\""
+  }
+]
