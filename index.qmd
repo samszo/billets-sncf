@@ -57,10 +57,11 @@ billets-sncf/
 
 ## Lancement rapide
 
-```bash
-# Mode Gmail (recommandé)
-python3 fetch_and_report.py
+Un seul script à exécuter — la source est choisie automatiquement :
 
-# Mode fichiers locaux
-python3 report_local.py
+```bash
+python3 fetch_and_report.py
 ```
+
+- Si le dossier `mails/` contient des `.eml` → traitement local, sans connexion réseau
+- Sinon → connexion Gmail via OAuth2 avec cache local

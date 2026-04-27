@@ -38,21 +38,55 @@ Le résultat est un rapport HTML interactif consultable dans n'importe quel navi
 ### Fichiers du projet
 
 ```
-billets sncf/
-├── sncf_report.py          ← module partagé (coûts + HTML)
-├── fetch_and_report.py     ← récupération Gmail (mode principal)
-├── report_local.py         ← traitement fichiers .eml locaux
-├── credentials.json        ← à créer (voir section Setup Gmail)
-├── token.json              ← créé automatiquement au 1er lancement
-├── email_cache.json        ← créé automatiquement (cache des mails)
+billets-sncf/
+├── sncf_report.py             ← module partagé (coûts + HTML)
+├── fetch_and_report.py        ← point d'entrée unique
+├── mails/                     ← déposer les .eml ici (mode local)
+├── credentials.json           ← à créer (voir section Setup Gmail)
+├── token.json                 ← créé automatiquement au 1er lancement Gmail
+├── email_cache.json           ← créé automatiquement (cache Gmail)
 └── billets_sncf_rapport.html  ← rapport généré
 ```
 
 ---
 
-## Mode 1 — Récupération depuis Gmail (recommandé)
+## Choix automatique de la source
 
-Ce mode télécharge directement les mails depuis votre boîte Gmail, en ne récupérant que les **nouveaux messages** à chaque lancement grâce au cache.
+`fetch_and_report.py` est le **seul script à lancer**. Il choisit la source automatiquement :
+
+```{mermaid}
+flowchart LR
+    START([python3 fetch_and_report.py])
+    START --> Q{"mails/*.eml\nexistent ?"}
+    Q -->|Oui| L["Mode local\n→ lit mails/\nsans connexion réseau"]
+    Q -->|Non| G["Mode Gmail\n→ OAuth2 + cache"]
+    L & G --> R[/"billets_sncf_rapport.html"/]
+
+    style L fill:#e8f5e9,stroke:#2e7d32
+    style G fill:#e3f2fd,stroke:#1565c0
+```
+
+---
+
+## Mode 1 — Fichiers .eml locaux (prioritaire)
+
+Si vous avez exporté vos mails depuis un client (Thunderbird, Apple Mail…) en format `.eml`, placez-les dans le sous-dossier `mails/` et lancez :
+
+```bash
+python3 fetch_and_report.py
+```
+
+Le script détecte les fichiers et traite **sans aucune connexion réseau**.
+
+::: {.callout-tip}
+Dans **Thunderbird** : sélectionner les mails → clic droit → Enregistrer sous → choisir le format `.eml`.
+:::
+
+---
+
+## Mode 2 — Récupération depuis Gmail
+
+Ce mode télécharge directement les mails depuis votre boîte Gmail, en ne récupérant que les **nouveaux messages** à chaque lancement grâce au cache. Il s'active automatiquement si le dossier `mails/` est vide ou absent.
 
 ### Étape 1 — Configurer l'API Gmail
 
@@ -131,20 +165,6 @@ Si de nouveaux billets ont été reçus :
   téléchargé 1/1…
 Cache mis à jour : 1 nouveau(x) mail(s) ajouté(s)
 ```
-
----
-
-## Mode 2 — Fichiers .eml locaux
-
-Si vous avez exporté vos mails depuis un client (Thunderbird, Apple Mail…) en format `.eml`, placez-les dans le dossier du projet et lancez :
-
-```bash
-python3 report_local.py
-```
-
-::: {.callout-tip}
-Dans **Thunderbird** : sélectionner les mails → clic droit → Enregistrer sous → choisir le format `.eml`.
-:::
 
 ---
 
@@ -292,8 +312,8 @@ pip3 install google-auth-oauthlib google-api-python-client
 
 ### Le rapport affiche 0 billet
 
+- Mode local : vérifiez que les fichiers `.eml` sont dans le sous-dossier **`mails/`**
 - Mode Gmail : vérifiez que `credentials.json` est bien dans le dossier du projet
-- Mode local : vérifiez que les fichiers `.eml` sont dans le **même dossier** que `report_local.py`
 
 ### Les montants affichent `?`
 

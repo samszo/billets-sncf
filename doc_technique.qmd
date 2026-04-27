@@ -19,15 +19,23 @@ format:
 
 ## Vue d'ensemble
 
-Le projet extrait les confirmations de réservation SNCF Connect depuis Gmail, calcule le coût réel de chaque déplacement (billet + voiture + métro + repas) et produit un rapport HTML interactif avec cumuls par mois et par année.
+Le projet extrait les confirmations de réservation SNCF Connect, calcule le coût réel de chaque déplacement (billet + voiture + métro + repas) et produit un rapport HTML interactif avec cumuls par mois et par année.
+
+`fetch_and_report.py` est le **point d'entrée unique** : il choisit automatiquement la source selon la présence de fichiers `.eml` dans le dossier `mails/`.
 
 ### Architecture des modules
 
 ```{mermaid}
 graph TD
     subgraph Sources["Sources de données"]
+        M[/"mails/*.eml\n(prioritaire)"/]
         G[/"Gmail API\n(OAuth2)"/]
-        E[/"Fichiers .eml\n(local)"/]
+    end
+
+    subgraph Entry["Point d'entrée — fetch_and_report.py"]
+        SEL{"mails/*.eml\nexistent ?"}
+        EML["fetch_from_eml()\nlecture locale"]
+        GMAIL["fetch_emails()\nGmail API + cache"]
     end
 
     subgraph Core["Module partagé — sncf_report.py"]
@@ -40,11 +48,6 @@ graph TD
         CONST["Constantes\nDISTANCE_KM · RATE_KM\nMETRO_TICKET · LUNCH_COST"]
     end
 
-    subgraph Scripts["Scripts d'entrée"]
-        F["fetch_and_report.py\n(Gmail + cache)"]
-        L["report_local.py\n(fichiers locaux)"]
-    end
-
     subgraph Persistance["Persistance"]
         CA[("email_cache.json")]
         TK[("token.json")]
@@ -52,22 +55,23 @@ graph TD
         RPT[/"billets_sncf_rapport.html"/]
     end
 
-    G -->|"messages.list\nmessages.get"| F
-    E --> L
-    F -->|parse| H & X & P
-    L -->|parse| H & X & P
-    F & L -->|trip dict| C
+    M -->|Oui| SEL
+    SEL -->|Oui| EML
+    SEL -->|Non| GMAIL
+    G -->|"messages.list\nmessages.get"| GMAIL
+    EML & GMAIL -->|parse| H & X & P
+    EML & GMAIL -->|trip dict| C
     CONST --> C
     C -->|car, metro, lunch| GH
     H & X & P --> GH
-    F <-->|"load / save"| CA
-    F <-->|"refresh token"| TK
-    CR -->|"OAuth flow"| F
+    GMAIL <-->|"load / save"| CA
+    GMAIL <-->|"refresh token"| TK
+    CR -->|"OAuth flow"| GMAIL
     GH -->|écrit| RPT
 
     style Core fill:#fff3e0,stroke:#e65100
     style Sources fill:#e3f2fd,stroke:#1565c0
-    style Scripts fill:#f3e5f5,stroke:#6a1b9a
+    style Entry fill:#f3e5f5,stroke:#6a1b9a
     style Persistance fill:#e8f5e9,stroke:#2e7d32
 ```
 
@@ -193,7 +197,37 @@ Le rapport HTML est **autonome** (embed-resources) : les données JSON sont inje
 
 ## Script `fetch_and_report.py`
 
-Récupère les mails directement depuis Gmail via l'API officielle avec OAuth 2.0.
+Point d'entrée unique du projet. Choisit automatiquement la source de données au démarrage, puis calcule les coûts et génère le rapport.
+
+### Sélection de la source
+
+```{mermaid}
+flowchart TD
+    START([python3 fetch_and_report.py])
+    START --> CHK["glob(mails/*.eml)"]
+    CHK --> BR{"Fichiers trouvés ?"}
+    BR -->|Oui| LOCAL["Mode local\nfetch_from_eml(MAILS_DIR)\nAucune connexion réseau"]
+    BR -->|Non| OAUTH["Mode Gmail\nOAuth2 + cache\nfetch_emails(service)"]
+    LOCAL & OAUTH --> ENRICH["compute_extra()\npour chaque trip"]
+    ENRICH --> HTML["generate_html()\nbillets_sncf_rapport.html"]
+    HTML --> OPEN([Ouvrir le rapport])
+
+    style LOCAL fill:#e8f5e9,stroke:#2e7d32
+    style OAUTH fill:#e3f2fd,stroke:#1565c0
+```
+
+### Fonction `fetch_from_eml(mails_dir)`
+
+Traite les fichiers `.eml` du dossier `mails/` sans aucune connexion réseau.
+
+| Étape | Opération |
+|-------|-----------|
+| 1 | `glob(mails_dir/*.eml)` — liste et trie les fichiers |
+| 2 | `emaillib.message_from_bytes()` — parse le MIME |
+| 3 | `decode_header_str()` — décode l'objet RFC 2047 |
+| 4 | `extract_amount()` — extrait le montant depuis `text/plain` |
+| 5 | `parsedate_to_datetime()` — convertit la date (fallback : nom de fichier) |
+| 6 | `parse_subject()` — extrait route, aller, retour |
 
 ### Flux OAuth2
 
