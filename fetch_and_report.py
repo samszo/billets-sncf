@@ -34,6 +34,7 @@ except ImportError:
 import sncf_report as R
 
 DIR          = os.path.dirname(os.path.abspath(__file__))
+MAILS_DIR    = os.path.join(DIR, "mails")          # dossier .eml local (prioritaire)
 CREDENTIALS  = os.path.join(DIR, "credentials.json")
 TOKEN_FILE   = os.path.join(DIR, "token.json")
 CACHE_FILE   = os.path.join(DIR, "email_cache.json")
@@ -41,6 +42,46 @@ REPORT_FILE  = os.path.join(DIR, "billets_sncf_rapport.html")
 SCOPES       = ["https://www.googleapis.com/auth/gmail.readonly"]
 SENDER       = "noreply@connect.sncf"
 SUBJECT_PREF = "Votre voyage"
+
+# ── Mode local : lecture des fichiers .eml dans mails/ ───────────────────────
+
+def fetch_from_eml(mails_dir):
+    """Parse tous les .eml de mails_dir sans contacter Gmail."""
+    import glob
+    files = sorted(glob.glob(os.path.join(mails_dir, "*.eml")))
+    print(f"{len(files)} fichier(s) .eml trouvé(s) dans {mails_dir}")
+    trips = []
+    for filepath in files:
+        with open(filepath, "rb") as fh:
+            msg = emaillib.message_from_bytes(fh.read())
+        subject  = R.decode_header_str(msg.get("Subject", ""))
+        date_str = msg.get("Date", "")
+        amount = None
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain":
+                payload = part.get_payload(decode=True).decode("utf-8", errors="replace")
+                amount = R.extract_amount(payload)
+                break
+        try:
+            dt = emaillib.utils.parsedate_to_datetime(date_str)
+            purchase_date = dt.strftime("%Y-%m-%d")
+            year  = dt.strftime("%Y")
+            month = dt.strftime("%Y-%m")
+        except Exception:
+            import re as _re
+            m2 = _re.search(r"(\d{4}-\d{2}-\d{2})", os.path.basename(filepath))
+            purchase_date = m2.group(1) if m2 else ""
+            year  = purchase_date[:4]  if purchase_date else ""
+            month = purchase_date[:7]  if purchase_date else ""
+        route, travel_date, return_date = R.parse_subject(subject)
+        trips.append({
+            "subject": subject, "purchase_date": purchase_date,
+            "year": year, "month": month, "route": route,
+            "travel_date": travel_date, "return_date": return_date,
+            "amount": amount,
+        })
+    trips.sort(key=lambda x: x["purchase_date"])
+    return trips
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
 
@@ -225,12 +266,20 @@ def print_summary(trips):
 
 def main():
     print("=" * 60)
-    print("  Billets SNCF — Récupération via Gmail API (OAuth2)")
-    print("=" * 60)
 
-    creds   = get_credentials()
-    service = build("gmail", "v1", credentials=creds)
-    trips   = fetch_emails(service)
+    # Priorité au dossier mails/ s'il contient des .eml
+    import glob
+    eml_files = glob.glob(os.path.join(MAILS_DIR, "*.eml"))
+    if eml_files:
+        print(f"  Billets SNCF — Mode local ({MAILS_DIR})")
+        print("=" * 60)
+        trips = fetch_from_eml(MAILS_DIR)
+    else:
+        print("  Billets SNCF — Récupération via Gmail API (OAuth2)")
+        print("=" * 60)
+        creds   = get_credentials()
+        service = build("gmail", "v1", credentials=creds)
+        trips   = fetch_emails(service)
 
     if not trips:
         print("Aucun billet trouvé.")
